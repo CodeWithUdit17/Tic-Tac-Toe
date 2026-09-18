@@ -48,20 +48,24 @@ class SoundManager(private val context: Context) {
     }
 
     fun playTap() {
-        if (isHapticsEnabled) {
-            vibrate(25, 120)
-        }
-        if (isSoundEnabled) {
-            safePlayTone(ToneGenerator.TONE_PROP_BEEP, 35)
+        audioScope.launch {
+            if (isHapticsEnabled) {
+                vibrate(25, 120)
+            }
+            if (isSoundEnabled) {
+                safePlayTone(ToneGenerator.TONE_PROP_BEEP, 35)
+            }
         }
     }
 
     fun playAiMove() {
-        if (isHapticsEnabled) {
-            vibrate(20, 90)
-        }
-        if (isSoundEnabled) {
-            safePlayTone(ToneGenerator.TONE_PROP_ACK, 40)
+        audioScope.launch {
+            if (isHapticsEnabled) {
+                vibrate(20, 90)
+            }
+            if (isSoundEnabled) {
+                safePlayTone(ToneGenerator.TONE_PROP_ACK, 40)
+            }
         }
     }
 

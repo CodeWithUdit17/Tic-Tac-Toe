@@ -89,7 +89,7 @@ fun TicTacToeGameScreen() {
         if (engine.gameMode == GameMode.PVE && engine.currentPlayer == "O" && !engine.isGameOver) {
             aiJob?.cancel()
             aiJob = coroutineScope.launch {
-                delay(280) // Responsive AI deliberation delay
+                delay(60) // Fast and natural 60ms AI response
                 if (engine.isGameOver || engine.gameMode != GameMode.PVE || engine.currentPlayer != "O") return@launch
                 val aiMove = engine.getBestAiMove()
                 if (aiMove != null && !engine.isGameOver) {
@@ -98,7 +98,7 @@ fun TicTacToeGameScreen() {
                         soundManager.playAiMove()
                         refreshState()
                         if (engine.isGameOver) {
-                            delay(350)
+                            delay(120)
                             if (engine.winner == "Draw") {
                                 soundManager.playDraw()
                             } else {
@@ -160,6 +160,7 @@ fun TicTacToeGameScreen() {
                 board = engine.board,
                 winningLine = engine.winningLine,
                 isGameOver = engine.isGameOver,
+                revision = gameStateRevision,
                 onCellClick = { r, c ->
                     if (engine.isGameOver) return@BoardGrid
                     if (engine.gameMode == GameMode.PVE && engine.currentPlayer == "O") return@BoardGrid
@@ -172,7 +173,7 @@ fun TicTacToeGameScreen() {
                         if (engine.isGameOver) {
                             aiJob?.cancel()
                             coroutineScope.launch {
-                                delay(350)
+                                delay(120)
                                 if (engine.winner == "Draw") {
                                     soundManager.playDraw()
                                 } else {

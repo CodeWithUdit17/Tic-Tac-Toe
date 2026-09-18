@@ -56,7 +56,8 @@ fun BoardGrid(
     winningLine: WinningLine?,
     isGameOver: Boolean,
     onCellClick: (Int, Int) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    revision: Int = 0
 ) {
     Box(
         modifier = modifier
@@ -118,17 +119,8 @@ private fun BoardCell(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
-    // Tactile bounce scale on press
-    val scale = remember { Animatable(1f) }
-    LaunchedEffect(isPressed) {
-        scale.animateTo(
-            targetValue = if (isPressed) 0.92f else 1f,
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessLow
-            )
-        )
-    }
+    // Instant tactile feedback (fast 40ms scale)
+    val scale = if (isPressed) 0.95f else 1f
 
     // Winning cell glow pulse
     val infiniteTransition = rememberInfiniteTransition(label = "winPulse")
@@ -158,7 +150,7 @@ private fun BoardCell(
 
     Box(
         modifier = modifier
-            .scale(scale.value)
+            .scale(scale)
             .clip(RoundedCornerShape(16.dp))
             .background(cellBg)
             .border(if (isWinningCell) 2.dp else 1.dp, cellBorder, RoundedCornerShape(16.dp))
@@ -177,21 +169,9 @@ private fun BoardCell(
 
 @Composable
 private fun MarkDrawing(mark: String, isWinning: Boolean) {
-    val markScale = remember { Animatable(0f) }
-    LaunchedEffect(mark) {
-        markScale.animateTo(
-            targetValue = 1f,
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessMedium
-            )
-        )
-    }
-
     Canvas(
         modifier = Modifier
             .fillMaxSize(0.62f)
-            .scale(markScale.value)
     ) {
         val w = size.width
         val h = size.height
