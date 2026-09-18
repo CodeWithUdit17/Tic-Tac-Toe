@@ -218,7 +218,7 @@ class TicTacToeEngine(private val context: Context? = null) {
     }
 
     // -------------------------------------------------------------
-    // PERSISTENCE (MATCH HISTORY)
+    // PERSISTENCE (MATCH HISTORY) - ASYNC BACKGROUND IO
     // -------------------------------------------------------------
     private fun recordMatch(win: String) {
         val dateStr = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
@@ -237,23 +237,28 @@ class TicTacToeEngine(private val context: Context? = null) {
         saveHistoryToStorage()
     }
 
+    private val ioExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+
     private fun saveHistoryToStorage() {
         if (context == null) return
-        try {
-            val jsonArray = JSONArray()
-            for (m in matchHistory) {
-                val obj = JSONObject()
-                obj.put("id", m.id)
-                obj.put("winner", m.winner)
-                obj.put("totalMoves", m.totalMoves)
-                obj.put("date", m.date)
-                obj.put("mode", m.mode)
-                obj.put("difficulty", m.difficulty)
-                jsonArray.put(obj)
-            }
-            val file = File(context.filesDir, "match_history.json")
-            file.writeText(jsonArray.toString(2))
-        } catch (_: Exception) {}
+        val recordsCopy = ArrayList(matchHistory)
+        ioExecutor.execute {
+            try {
+                val jsonArray = JSONArray()
+                for (m in recordsCopy) {
+                    val obj = JSONObject()
+                    obj.put("id", m.id)
+                    obj.put("winner", m.winner)
+                    obj.put("totalMoves", m.totalMoves)
+                    obj.put("date", m.date)
+                    obj.put("mode", m.mode)
+                    obj.put("difficulty", m.difficulty)
+                    jsonArray.put(obj)
+                }
+                val file = File(context.filesDir, "match_history.json")
+                file.writeText(jsonArray.toString(2))
+            } catch (_: Exception) {}
+        }
     }
 
     private fun loadHistoryFromStorage() {

@@ -1,53 +1,67 @@
 package com.tictactoe.game.sound
 
 import android.content.Context
-import android.media.AudioAttributes
-import android.media.AudioFormat
-import android.media.AudioTrack
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.sin
 
+/**
+ * Crash-proof, 100% offline audio and haptic feedback engine.
+ * Utilizes native ToneGenerator for zero-allocation, zero-latency, hardware-accelerated sound.
+ */
 class SoundManager(private val context: Context) {
     var isSoundEnabled: Boolean = true
     var isHapticsEnabled: Boolean = true
 
-    private val vibrator: Vibrator? by lazy {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
-            vibratorManager?.defaultVibrator
-        } else {
-            @Suppress("DEPRECATION")
-            context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+    private val audioScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+
+    private var toneGen: ToneGenerator? = null
+
+    init {
+        try {
+            toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 65)
+        } catch (_: Exception) {
+            toneGen = null
         }
     }
 
-    private val audioScope = CoroutineScope(Dispatchers.Default)
+    private val vibrator: Vibrator? by lazy {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                vibratorManager?.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
 
     fun playTap() {
         if (isHapticsEnabled) {
             vibrate(25, 120)
         }
         if (isSoundEnabled) {
-            audioScope.launch {
-                playTone(freq = 680.0, durationMs = 35, volume = 0.35f)
-            }
+            safePlayTone(ToneGenerator.TONE_PROP_BEEP, 35)
         }
     }
 
     fun playAiMove() {
         if (isHapticsEnabled) {
-            vibrate(20, 80)
+            vibrate(20, 90)
         }
         if (isSoundEnabled) {
-            audioScope.launch {
-                playTone(freq = 520.0, durationMs = 45, volume = 0.3f)
-            }
+            safePlayTone(ToneGenerator.TONE_PROP_ACK, 40)
         }
     }
 
@@ -57,11 +71,11 @@ class SoundManager(private val context: Context) {
         }
         if (isSoundEnabled) {
             audioScope.launch {
-                // Uplifting victory arpeggio: C5 -> E5 -> G5 -> C6
-                playTone(523.25, 90, 0.45f)
-                playTone(659.25, 90, 0.50f)
-                playTone(783.99, 110, 0.55f)
-                playTone(1046.50, 240, 0.65f)
+                safePlayTone(ToneGenerator.TONE_PROP_BEEP, 70)
+                delay(80)
+                safePlayTone(ToneGenerator.TONE_PROP_ACK, 90)
+                delay(100)
+                safePlayTone(ToneGenerator.TONE_PROP_PROMPT, 180)
             }
         }
     }
@@ -72,8 +86,9 @@ class SoundManager(private val context: Context) {
         }
         if (isSoundEnabled) {
             audioScope.launch {
-                playTone(440.0, 100, 0.35f)
-                playTone(370.0, 160, 0.30f)
+                safePlayTone(ToneGenerator.TONE_PROP_NACK, 90)
+                delay(110)
+                safePlayTone(ToneGenerator.TONE_PROP_NACK, 120)
             }
         }
     }
@@ -83,10 +98,17 @@ class SoundManager(private val context: Context) {
             vibrate(15, 60)
         }
         if (isSoundEnabled) {
-            audioScope.launch {
-                playTone(400.0, 25, 0.25f)
-            }
+            safePlayTone(ToneGenerator.TONE_PROP_BEEP2, 25)
         }
+    }
+
+    private fun safePlayTone(toneType: Int, durationMs: Int) {
+        try {
+            if (toneGen == null) {
+                toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 65)
+            }
+            toneGen?.startTone(toneType, durationMs)
+        } catch (_: Exception) {}
     }
 
     private fun vibrate(durationMs: Long, amplitude: Int = 128) {
@@ -111,57 +133,10 @@ class SoundManager(private val context: Context) {
         } catch (_: Exception) {}
     }
 
-    private fun playTone(freq: Double, durationMs: Int, volume: Float) {
-        val sampleRate = 22050
-        val numSamples = (sampleRate * (durationMs / 1000.0)).toInt().coerceAtLeast(1)
-        val generatedSnd = ByteArray(2 * numSamples)
-
-        // Generate Sine wave with attack/decay envelope to eliminate clicks
-        val attackSamples = (numSamples * 0.1).toInt().coerceAtLeast(1)
-        val decaySamples = (numSamples * 0.3).toInt().coerceAtLeast(1)
-        val sustainSamples = numSamples - attackSamples - decaySamples
-
-        for (i in 0 until numSamples) {
-            val dVal = sin(2.0 * Math.PI * i / (sampleRate / freq))
-
-            // Envelope calculation
-            val envelope = when {
-                i < attackSamples -> i.toFloat() / attackSamples
-                i < attackSamples + sustainSamples -> 1.0f
-                else -> {
-                    val decayIndex = i - attackSamples - sustainSamples
-                    (1.0f - (decayIndex.toFloat() / decaySamples)).coerceAtLeast(0f)
-                }
-            }
-
-            val sample = (dVal * 32767 * volume * envelope).toInt().coerceIn(-32768, 32767).toShort()
-            generatedSnd[2 * i] = (sample.toInt() and 0x00ff).toByte()
-            generatedSnd[2 * i + 1] = ((sample.toInt() and 0xff00) ushr 8).toByte()
-        }
-
+    fun release() {
         try {
-            val audioTrack = AudioTrack.Builder()
-                .setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_GAME)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build()
-                )
-                .setAudioFormat(
-                    AudioFormat.Builder()
-                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                        .setSampleRate(sampleRate)
-                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-                        .build()
-                )
-                .setBufferSizeInBytes(generatedSnd.size)
-                .setTransferMode(AudioTrack.MODE_STATIC)
-                .build()
-
-            audioTrack.write(generatedSnd, 0, generatedSnd.size)
-            audioTrack.play()
-            Thread.sleep(durationMs.toLong() + 20)
-            audioTrack.release()
+            toneGen?.release()
+            toneGen = null
         } catch (_: Exception) {}
     }
 }

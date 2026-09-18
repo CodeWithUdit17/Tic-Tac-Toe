@@ -71,6 +71,15 @@ fun TicTacToeGameScreen() {
     var showVictoryDialog by remember { mutableStateOf(false) }
     var showHistoryDialog by remember { mutableStateOf(false) }
 
+    var aiJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        onDispose {
+            aiJob?.cancel()
+            soundManager.release()
+        }
+    }
+
     fun refreshState() {
         gameStateRevision++
     }
@@ -78,8 +87,10 @@ fun TicTacToeGameScreen() {
     // Function to perform AI turn if applicable
     fun triggerAiIfNeeded() {
         if (engine.gameMode == GameMode.PVE && engine.currentPlayer == "O" && !engine.isGameOver) {
-            coroutineScope.launch {
-                delay(360) // Organic AI deliberation delay
+            aiJob?.cancel()
+            aiJob = coroutineScope.launch {
+                delay(280) // Responsive AI deliberation delay
+                if (engine.isGameOver || engine.gameMode != GameMode.PVE || engine.currentPlayer != "O") return@launch
                 val aiMove = engine.getBestAiMove()
                 if (aiMove != null && !engine.isGameOver) {
                     val moved = engine.makeMove(aiMove.first, aiMove.second)
@@ -87,7 +98,7 @@ fun TicTacToeGameScreen() {
                         soundManager.playAiMove()
                         refreshState()
                         if (engine.isGameOver) {
-                            delay(400)
+                            delay(350)
                             if (engine.winner == "Draw") {
                                 soundManager.playDraw()
                             } else {
@@ -123,6 +134,7 @@ fun TicTacToeGameScreen() {
                     isHapticsEnabled = soundManager.isHapticsEnabled
                 },
                 onResetScores = {
+                    aiJob?.cancel()
                     engine.resetScores()
                     engine.resetBoard()
                     soundManager.playUndo()
@@ -158,8 +170,9 @@ fun TicTacToeGameScreen() {
                         refreshState()
 
                         if (engine.isGameOver) {
+                            aiJob?.cancel()
                             coroutineScope.launch {
-                                delay(400)
+                                delay(350)
                                 if (engine.winner == "Draw") {
                                     soundManager.playDraw()
                                 } else {
@@ -179,6 +192,7 @@ fun TicTacToeGameScreen() {
                 gameMode = engine.gameMode,
                 aiDifficulty = engine.aiDifficulty,
                 onModeChange = { newMode ->
+                    aiJob?.cancel()
                     engine.gameMode = newMode
                     engine.resetBoard()
                     refreshState()
@@ -194,17 +208,20 @@ fun TicTacToeGameScreen() {
             GameActionToolbar(
                 canUndo = engine.moveHistory.isNotEmpty() && !engine.isGameOver,
                 onUndo = {
+                    aiJob?.cancel()
                     if (engine.undoLastMove()) {
                         soundManager.playUndo()
                         refreshState()
                     }
                 },
                 onNewRound = {
+                    aiJob?.cancel()
                     engine.resetBoard()
                     soundManager.playUndo()
                     refreshState()
                 },
                 onResetScores = {
+                    aiJob?.cancel()
                     engine.resetScores()
                     engine.resetBoard()
                     refreshState()
