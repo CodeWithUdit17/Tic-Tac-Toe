@@ -1,0 +1,12 @@
+<?xml version="1.0" ?>
+<MatchLogArchive>
+    <Match id="1" date="2026-09-18 15:59:40" winner="X" totalMoves="7">
+        <Action step="1" player="X" coordinate="(0,0)"/>
+        <Action step="2" player="O" coordinate="(2,2)"/>
+        <Action step="3" player="X" coordinate="(0,2)"/>
+        <Action step="4" player="O" coordinate="(2,0)"/>
+        <Action step="5" player="X" coordinate="(1,1)"/>
+        <Action step="6" player="O" coordinate="(1,2)"/>
+        <Action step="7" player="X" coordinate="(0,1)"/>
+    </Match>
+</MatchLogArchive>
